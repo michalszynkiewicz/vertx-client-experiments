@@ -1,6 +1,8 @@
-import com.github.michalszynkiewicz.kmp.BoundaryFinder;
+import com.github.michalszynkiewicz.rest.HttpMultipartResponseDecoder;
+import io.netty.handler.codec.http.DefaultHttpContent;
+import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.vertx.core.AsyncResult;
-import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpClientRequest;
@@ -8,9 +10,7 @@ import io.vertx.core.http.HttpClientResponse;
 import io.vertx.core.http.HttpMethod;
 
 import java.io.File;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.List;
 
 import static io.netty.handler.codec.http.HttpHeaders.Values.BOUNDARY;
 
@@ -45,69 +45,79 @@ public class ClientApp {
         } else {
             HttpClientResponse response = r.result();
 
-            String contentType = response.getHeader(CONTENT_TYPE);
-            System.out.println("Content-Type: " + contentType);
-            int splitterPosition = contentType.indexOf(';');
+            HttpMultipartResponseDecoder multipartDecoder = new HttpMultipartResponseDecoder(response);
 
-            if (splitterPosition > -1) {
-                String originalType = contentType;
-                contentType = originalType.substring(0, splitterPosition);
-                // mstodo support custom part of the content type
-                if (contentType.equalsIgnoreCase("multipart/form-data")){
-// mstodo let's make params start with ';'
-                    String params = originalType.substring(splitterPosition);
-                    int boundaryStart = params.indexOf(BOUNDARY_PARAM);
-                    if (boundaryStart < 0) {
-                        throw new IllegalArgumentException("Invalid multipart params, cannot find boundary");
-                    }
-                    boundaryStart += BOUNDARY_PARAM.length();
+            response.handler(buffer -> {
+                multipartDecoder.offer(new DefaultHttpContent(buffer.getByteBuf()));
+            });
 
-                    if (boundaryStart >= params.length()) {
-                        throw new IllegalArgumentException("Empty boundary");
-                    }
+            response.endHandler(v -> {
+                multipartDecoder.offer(LastHttpContent.EMPTY_LAST_CONTENT);
 
-                    // mstodo test for empty boundary
-                    int boundaryEnd = params.indexOf(';', boundaryStart + 1);
-                    boundaryEnd = boundaryEnd < 0 ? params.length() : boundaryEnd;
-                    String boundary = "--" + params.substring(boundaryStart, boundaryEnd);
-                    System.out.println("Boundary " + boundary);
-
-                    MultipartResponseParser parser = new MultipartResponseParser(boundary);
-                    response.handler(parser);
-
-                    response.endHandler(v -> {
-                        System.out.println("done");
-                        vertx.close();
-                    });
-                }
-            }
-//            response.fetch(10);
+                List<InterfaceHttpData> datas = multipartDecoder.getBodyHttpDatas();
+                System.out.println(datas);
+            });
+//
+//            String contentType = response.getHeader(CONTENT_TYPE);
+//            System.out.println("Content-Type: " + contentType);
+//            int splitterPosition = contentType.indexOf(';');
+//
+//            if (splitterPosition > -1) {
+//                String originalType = contentType;
+//                contentType = originalType.substring(0, splitterPosition);
+//                // mstodo support custom part of the content type
+//                if (contentType.equalsIgnoreCase("multipart/form-data")) {
+//// mstodo let's make params start with ';'
+//                    String params = originalType.substring(splitterPosition);
+//                    int boundaryStart = params.indexOf(BOUNDARY_PARAM);
+//                    if (boundaryStart < 0) {
+//                        throw new IllegalArgumentException("Invalid multipart params, cannot find boundary");
+//                    }
+//                    boundaryStart += BOUNDARY_PARAM.length();
+//
+//                    if (boundaryStart >= params.length()) {
+//                        throw new IllegalArgumentException("Empty boundary");
+//                }
+//
+//                // mstodo test for empty boundary
+//                int boundaryEnd = params.indexOf(';', boundaryStart + 1);
+//                boundaryEnd = boundaryEnd < 0 ? params.length() : boundaryEnd;
+//                    String boundary = "--" + params.substring(boundaryStart, boundaryEnd);
+//                    System.out.println("Boundary " + boundary);
+//
+//                    MultipartResponseParser parser = new MultipartResponseParser(boundary);
+//                    response.handler(parser);
+//
+//
+//                }
         }
+//            response.fetch(10);
     }
+//    }
 
     static void print(Buffer buffer) {
         System.out.println("chunk: " + buffer.toString());
     }
 
-    public static class MultipartResponseParser implements Handler<Buffer> {
-        private final BoundaryFinder boundaryFinder;
-        final Map<String, Buffer> attributes = new HashMap<>();
-        final Map<String, FileAttribute> files = new HashMap<>();
-
-        public MultipartResponseParser(String boundary) {
-            boundaryFinder = new BoundaryFinder(boundary);
-        }
-
-        @Override
-        public void handle(Buffer event) {
-                File file = new File(downloads, UUID.randomUUID().toString());
-                for (byte aByte : event.getBytes()) {
-                    // mstodo if octet stream - decode!
-                    // mstodo maybe just find the netty classes that do the parsing for the server side?
-                    boundaryFinder.addAndCheck()
-                }
-        }
-    }
+//    public static class MultipartResponseParser implements Handler<Buffer> {
+//        private final BoundaryFinder boundaryFinder;
+//        final Map<String, Buffer> attributes = new HashMap<>();
+//        final Map<String, FileAttribute> files = new HashMap<>();
+//
+//        public MultipartResponseParser(String boundary) {
+//            boundaryFinder = new BoundaryFinder(boundary);
+//        }
+//
+//        @Override
+//        public void handle(Buffer event) {
+//            File file = new File(downloads, UUID.randomUUID().toString());
+//            for (byte aByte : event.getBytes()) {
+//                // mstodo if octet stream - decode!
+//                // mstodo maybe just find the netty classes that do the parsing for the server side?
+//                boundaryFinder.addAndCheck()
+//            }
+//        }
+//    }
 
     public static class FileAttribute {
         final File file;

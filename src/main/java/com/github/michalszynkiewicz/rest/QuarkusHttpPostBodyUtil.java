@@ -318,4 +318,33 @@ final class QuarkusHttpPostBodyUtil {
         }
         return null;
     }
+
+    private static String[] splitHeaderContentType(String sb) {
+        int aStart;
+        int aEnd;
+        int bStart;
+        int bEnd;
+        int cStart;
+        int cEnd;
+        aStart = findNonWhitespace(sb, 0);
+        aEnd =  sb.indexOf(';');
+        if (aEnd == -1) {
+            return new String[] { sb, "", "" };
+        }
+        bStart = findNonWhitespace(sb, aEnd + 1);
+        if (sb.charAt(aEnd - 1) == ' ') {
+            aEnd--;
+        }
+        bEnd =  sb.indexOf(';', bStart);
+        if (bEnd == -1) {
+            bEnd = findEndOfString(sb);
+            return new String[] { sb.substring(aStart, aEnd), sb.substring(bStart, bEnd), "" };
+        }
+        cStart = findNonWhitespace(sb, bEnd + 1);
+        if (sb.charAt(bEnd - 1) == ' ') {
+            bEnd--;
+        }
+        cEnd = findEndOfString(sb);
+        return new String[] { sb.substring(aStart, aEnd), sb.substring(bStart, bEnd), sb.substring(cStart, cEnd) };
+    }
 }
